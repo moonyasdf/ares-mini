@@ -1,0 +1,33 @@
+# --- START OF FILE requirements.txt ---
+
+# Core de ARES-Mini y Lógica de Orquestación
+# Usamos versiones modernas de LangChain para compatibilidad con LCEL.
+langchain-core
+langchain-community
+langchain-text-splitters
+langchain
+
+# Componentes de Lógica Personalizada de ARES
+# Chonkie es fundamental para el chunking de alto rendimiento.
+chonkie
+numpy # Para cálculos en RSE (Relevant Segment Extraction)
+requests # Para la comunicación con el servidor vLLM
+
+# Configuración y Validación
+toml # Para leer el archivo de configuración ares_mini_config.toml
+pydantic # Para la validación de la configuración y la salida estructurada de los LLM
+
+# Almacenamiento (Bases de Datos)
+qdrant-client # Cliente para la base de datos vectorial Qdrant
+SQLAlchemy # Dependencia para el KVStore basado en SQLite de LangChain
+
+# Extracción de Documentos (Plugins)
+PyMuPDF # Para el AresDocumentLoader (parsing de PDFs)
+
+# --- Opcional para Desarrollo y Pruebas ---
+# Descomenta las siguientes líneas si necesitas estas herramientas.
+# tqdm # Barras de progreso para operaciones largas
+# memory_profiler # Para analizar el uso de memoria
+# jupyter # Para ejecutar en formato notebook
+# ipykernel # Necesario para los notebooks de Jupyter
+# --- END OF FILE requirements.txt ---

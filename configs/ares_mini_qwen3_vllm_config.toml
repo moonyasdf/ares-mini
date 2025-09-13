@@ -1,0 +1,99 @@
+# --- START OF FILE configs/ares_mini_qwen3_vllm_config.toml ---
+
+# ==============================================================================
+#      Configuración de Alto Rendimiento para A-R-E-S Mini con Qwen3 y vLLM
+# ==============================================================================
+# Este archivo está optimizado para replicar la funcionalidad avanzada de `ares (alpha)`
+# utilizando los modelos de la familia Qwen3, servidos eficientemente a través de vLLM.
+
+# --- Configuración de Modelos ---
+# Define los modelos y cómo acceder a ellos. La clave es que el reranker ahora
+# también usa el proveedor vLLM, lo que permite la lógica de logprobs.
+[generation_llm]
+provider = "vllm"
+api_base = "http://127.0.0.1:8000/v1" # Asegúrate de que tu servidor vLLM corra aquí
+api_key = "EMPTY"
+# El modelo principal para generación, planificación y descripción.
+# Qwen3-0.6B es una excelente opción por su velocidad y calidad.
+model_name = "Qwen/Qwen3-0.6B"
+
+[embedding_model]
+# El embedder de Qwen3 es muy eficiente. Se recomienda cargarlo localmente para
+# un control más fino y para no sobrecargar el servidor vLLM con tareas de embedding.
+provider = "local_transformers"
+model_name = "Qwen/Qwen3-Embedding-0.6B"
+
+[reranker_model]
+# ¡CRUCIAL! Usamos 'vllm' como proveedor. La fábrica de componentes (`factories.py`)
+# detectará la combinación "vllm" + "qwen3-reranker" y cargará nuestro
+# QwenVLLMReranker, que usa la lógica de logprobs a través de la API de vLLM.
+provider = "vllm"
+model_name = "Qwen/Qwen3-Reranker-0.6B"
+
+# --- Configuración del Embedder Disperso ---
+[sparse_embedder]
+# BM25 es un excelente punto de partida: rápido, ligero y eficaz para palabras clave.
+model_name = "Qdrant/bm25"
+
+# --- Configuración de Bases de Datos ---
+[vector_store]
+provider = "qdrant"
+host = "localhost"
+port = 6333
+collection_name = "ares_mini_qwen3_vllm" # Nombre específico para esta configuración
+
+[kv_store]
+provider = "sqlite"
+# Se recomienda una ruta absoluta o una bien definida relativa al directorio de trabajo.
+path = "./ares_mini_data_qwen3/main_kv.db"
+
+# --- Configuración del Pipeline de Ingesta (Optimizada para Calidad) ---
+[ingestion]
+# Un tamaño de chunk moderado captura suficiente contexto local sin ser demasiado grande.
+chunk_size = 400
+# Un solapamiento mayor ayuda a RSE a reconstruir segmentos sin perder información en los bordes.
+chunk_overlap = 80
+# ✅ Activado. Esencial para la búsqueda jerárquica y los AutoContext Headers.
+generate_descriptions = true
+
+# --- Configuración del Pipeline de Recuperación (Optimizada para Calidad) ---
+[retrieval]
+# ✅ Activado. La búsqueda híbrida es casi siempre superior a la búsqueda puramente semántica.
+enable_sparse_search = true
+
+# RRF es el estándar de oro para fusionar resultados de búsqueda de diferentes fuentes.
+# Es más robusto que la suma ponderada y no requiere ajustar pesos.
+combination_method = "rrf"
+
+# Estos pesos son ignorados por RRF, pero se dejan por si se cambia el método.
+dense_weight = 0.5
+sparse_weight = 0.5
+
+# Un `top_k` inicial alto (150) le da al reranker y a RSE suficiente "materia prima"
+# para encontrar los mejores chunks y reconstruir segmentos coherentes.
+similarity_top_k = 150
+
+# Después del reranking, conservamos un número significativo de candidatos (50)
+# para que RSE tenga flexibilidad para encontrar los mejores segmentos contiguos.
+rerank_top_n = 50
+
+# --- Sub-sección para Relevant Segment Extraction (RSE) ---
+[retrieval.rse]
+# ✅ Activado. Esta es una de las características clave de ARES para reconstruir el contexto.
+use_rse = true
+# Un segmento puede tener hasta 10 chunks, permitiendo capturar párrafos largos o secciones.
+max_segment_length = 10
+# Devolvemos hasta 5 segmentos largos y coherentes. Esto proporciona un contexto rico y variado.
+overall_max_segments = 5
+# Un umbral moderado para filtrar segmentos de baja calidad.
+min_segment_value = 0.35
+
+# --- Sub-sección para Maximal Marginal Relevance (MMR) ---
+[retrieval.mmr]
+# ✅ Activado. Es el paso final para asegurar que el contexto enviado al LLM no sea redundante.
+use_mmr = true
+# 5 segmentos o chunks finales es un buen balance entre dar suficiente contexto y no sobrecargar el LLM.
+final_context_chunks = 5
+# Un valor de 0.65 prioriza ligeramente la relevancia sobre la diversidad,
+# asegurando que los resultados más importantes estén presentes, pero eliminando la redundancia.
+lambda_mult = 0.65

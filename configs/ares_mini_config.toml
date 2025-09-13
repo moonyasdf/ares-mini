@@ -1,0 +1,86 @@
+# --- START OF FILE configs/ares_mini_config.toml ---
+
+# ===================================================================
+#          Configuración Completa para A-R-E-S Mini
+# ===================================================================
+# Este archivo controla todos los aspectos del sistema RAG.
+# Modifica estos parámetros para ajustar el rendimiento y el comportamiento.
+
+# --- Configuración de Modelos (LLM, Embedding, Reranker) ---
+# Se asume que todos son servidos a través de una API compatible con vLLM.
+[llm]
+provider        = "vllm"
+api_base        = "http://localhost:8000/v1"
+api_key         = "EMPTY"
+model_name      = "meta-llama/Llama-3.1-8B-Instruct"  # Modelo para generación y razonamiento (Planner, Descriptions)
+embedding_model = "BAAI/bge-large-en-v1.5"            # Modelo para embeddings densos
+rerank_model    = "BAAI/bge-reranker-large"           # Modelo Cross-Encoder para reranking
+
+# --- Configuración del Embedder Disperso ---
+# Utiliza la librería `fastembed` para generar vectores léxicos.
+[sparse_embedder]
+model_name      = "Qdrant/bm25" # Modelo ligero y rápido. Alternativa: "prithivida/Splade_PP_en_v1" para SPLADE.
+
+# --- Configuración del Vector Store (Qdrant) ---
+[vector_store]
+provider        = "qdrant"
+host            = "localhost"
+port            = 6333
+collection_name = "ares_mini_final_v1"
+
+# --- Configuración del Key-Value Store (SQLite) ---
+# Usado por RSE para recuperar chunks y metadatos.
+[kv_store]
+provider        = "sqlite"
+path            = "ares_mini_kv_store.db" # Ruta relativa al directorio de trabajo.
+
+# --- Configuración del Pipeline de Ingesta ---
+[ingestion]
+chunk_size      = 384   # Tamaño objetivo de los chunks.
+chunk_overlap   = 64    # Solapamiento entre chunks.
+# Activa la generación de títulos y resúmenes para los documentos.
+# Esencial para la búsqueda jerárquica.
+generate_descriptions = true
+
+# --- Configuración del Pipeline de Recuperación ---
+[retrieval]
+# Activa o desactiva la parte dispersa (léxica) de la búsqueda.
+# Si es `false`, solo se realizará búsqueda semántica (densa).
+enable_sparse_search = true
+
+# Método para fusionar los resultados de la búsqueda densa y dispersa.
+# "rrf": Reciprocal Rank Fusion (recomendado, más robusto).
+# "weighted_sum": Suma ponderada de scores normalizados.
+combination_method = "rrf"
+
+# Pesos para 'weighted_sum' (son ignorados si el método es 'rrf').
+dense_weight = 0.6
+sparse_weight = 0.4
+
+# Número de chunks a recuperar en el paso inicial de la base de datos.
+similarity_top_k = 75
+
+# Número de chunks a conservar después del paso de reranking.
+# Estos son los candidatos que se pasarán a RSE.
+rerank_top_n = 25
+
+# --- Sub-sección para Relevant Segment Extraction (RSE) ---
+[retrieval.rse]
+# Activa o desactiva el paso de reconstrucción de contexto con RSE.
+use_rse = true
+# Máximo número de chunks que pueden componer un único segmento.
+max_segment_length = 10
+# Número máximo de segmentos finales que se generarán.
+overall_max_segments = 3
+# Umbral de "valor" acumulado que un segmento debe tener para ser considerado válido.
+min_segment_value = 0.3
+
+# --- Sub-sección para Maximal Marginal Relevance (MMR) ---
+[retrieval.mmr]
+# Activa o desactiva el paso final de diversificación con MMR.
+# Se aplica sobre los segmentos generados por RSE (o los chunks del reranker si RSE está desactivado).
+use_mmr = true
+# El número final de documentos/segmentos que se enviarán al LLM.
+final_context_chunks = 5
+# Parámetro de MMR: 1.0 para máxima relevancia, 0.0 para máxima diversidad.
+lambda_mult = 0.6
